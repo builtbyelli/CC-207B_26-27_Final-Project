@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/food.dart';
 import '../services/student_food_controller.dart';
 import '../foodwise_theme.dart';
+import 'dart:async';
 
 /// Shared control so card and detail screen use the same save/error behavior.
 class FavoriteButton extends StatelessWidget {
@@ -66,41 +67,56 @@ Future<void> toggleFavoriteWithFeedback(
     final changed = await controller.setFavorite(food, !wasSaved);
     if (!changed || !controller.active || !messenger.mounted) return;
     messenger.clearSnackBars();
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          wasSaved ? 'Removed from Favorites.' : 'Added to Favorites.',
-        ),
-        action: SnackBarAction(
-          label: 'Undo',
-          onPressed: () async {
+    Timer? autoDismissTimer;
+  messenger.showSnackBar(
+    SnackBar(
+      content: Text(
+        wasSaved ? 'Removed from Favorites.' : 'Added to Favorites.',
+      ),
+      duration: const Duration(seconds: 3),
+      behavior: SnackBarBehavior.floating,
+      action: SnackBarAction(
+        label: 'Undo',
+        onPressed: () async {
+          autoDismissTimer?.cancel();
+
+          if (!controller.active || !messenger.mounted) return;
+
+          try {
+            if (controller.isFavorite(food) == wasSaved) return;
+
+            final restored = await controller.setFavorite(food, wasSaved);
+
             if (!controller.active || !messenger.mounted) return;
-            try {
-              if (controller.isFavorite(food) == wasSaved) return;
-              final restored = await controller.setFavorite(food, wasSaved);
-              if (!controller.active || !messenger.mounted) return;
+
+            messenger.showSnackBar(
+              SnackBar(
+                content: Text(
+                  restored
+                      ? 'Change undone.'
+                      : 'Could not undo right now. Please try again.',
+                ),
+              ),
+            );
+          } catch (_) {
+            if (controller.active && messenger.mounted) {
               messenger.showSnackBar(
-                SnackBar(
-                  content: Text(
-                    restored
-                        ? 'Change undone.'
-                        : 'Could not undo right now. Please try again.',
-                  ),
+                const SnackBar(
+                  content: Text('Could not undo. Please try again.'),
                 ),
               );
-            } catch (_) {
-              if (controller.active && messenger.mounted) {
-                messenger.showSnackBar(
-                  const SnackBar(
-                    content: Text('Could not undo. Please try again.'),
-                  ),
-                );
-              }
             }
-          },
-        ),
+          }
+        },
       ),
-    );
+    ),
+  );
+
+  autoDismissTimer = Timer(const Duration(seconds: 3), () {
+    if (messenger.mounted) {
+      messenger.hideCurrentSnackBar();
+    }
+  });
   } catch (_) {
     if (controller.active && messenger.mounted) {
       messenger.showSnackBar(
