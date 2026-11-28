@@ -21,6 +21,7 @@ class _SpinMealScreenState extends State<SpinMealScreen>
 
   List<FoodWiseMeal> _meals = [];
   List<FoodWiseMeal> _filteredMeals = [];
+  List<FoodWiseMeal>? _spinMeals;
 
   String? _selectedCategory;
   bool _loading = true;
@@ -169,6 +170,7 @@ Future<void> _spinWheel() async {
 
   setState(() {
     _spinning = true;
+    _spinMeals = mealsAtSpin;
   });
 
   _controller.reset();
@@ -554,7 +556,7 @@ Future<void> _spinWheel() async {
                 child: CustomPaint(
                   size: const Size(300, 300),
                   painter: _MealWheelPainter(
-                    meals: _filteredMeals,
+                    meals: _spinning ? (_spinMeals ?? _filteredMeals) : _filteredMeals,
                     colors: _wheelColors,
                   ),
                 ),
