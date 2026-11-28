@@ -26,6 +26,7 @@ class _SpinMealScreenState extends State<SpinMealScreen>
   bool _loading = true;
   bool _spinning = false;
   String? _error;
+  String? _budgetError;
 
   double _rotation = 0;
 
@@ -105,18 +106,30 @@ void _applyFilters() {
       ? null
       : double.tryParse(budgetText);
 
+  // Validate the budget input.
+  if (budgetText.isNotEmpty && (budget == null || budget <= 0)) {
+    setState(() {
+      _budgetError = 'Please enter a valid budget greater than zero.';
+    });
+    return;
+  }
+
+  setState(() {
+    _budgetError = null;
+  });
+
   // Start with all meals that passed the existing
   // availability and saved dietary-safety filtering.
   var filtered = List<FoodWiseMeal>.from(_meals);
 
-  // Apply exact price matching only when a budget is entered.
+  // Show meals within the entered budget.
   if (budget != null) {
     filtered = filtered.where((meal) {
-      return (meal.price - budget).abs() < 0.001;
+      return meal.price <= budget;
     }).toList();
   }
 
-  // Apply category independently.
+  // Apply category filtering.
   if (_selectedCategory != null) {
     filtered = filtered.where((meal) {
       return meal.category == _selectedCategory;
@@ -413,57 +426,63 @@ Future<void> _spinWheel() async {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    ...categories.map((category) {
-                      final isSelected = temporarySelection == category;
-                      final title = category ?? 'All Categories';
-                      final icon = category == null
-                          ? Icons.grid_view_rounded
-                          : _categoryIcon(category);
+                    Flexible(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: categories.map((category) {
+                            final isSelected = temporarySelection == category;
+                            final title = category ?? 'All Categories';
+                            final icon = category == null
+                                ? Icons.grid_view_rounded
+                                : _categoryIcon(category);
 
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Material(
-                          color: isSelected
-                              ? const Color(0xFFFFE8D8)
-                              : Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(14),
-                            onTap: () => setSheetState(
-                              () => temporarySelection = category,
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 13,
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(icon, color: FoodWiseColors.deepOrange),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      title,
-                                      style: TextStyle(
-                                        color: FoodWiseColors.charcoal,
-                                        fontWeight: isSelected
-                                            ? FontWeight.w800
-                                            : FontWeight.w500,
-                                      ),
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Material(
+                                color: isSelected
+                                    ? const Color(0xFFFFE8D8)
+                                    : Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(14),
+                                  onTap: () => setSheetState(
+                                    () => temporarySelection = category,
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 13,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(icon, color: FoodWiseColors.deepOrange),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            title,
+                                            style: TextStyle(
+                                              color: FoodWiseColors.charcoal,
+                                              fontWeight: isSelected
+                                                  ? FontWeight.w800
+                                                  : FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                        if (isSelected)
+                                          const Icon(
+                                            Icons.check_circle_rounded,
+                                            color: FoodWiseColors.deepOrange,
+                                          ),
+                                      ],
                                     ),
                                   ),
-                                  if (isSelected)
-                                    const Icon(
-                                      Icons.check_circle_rounded,
-                                      color: FoodWiseColors.deepOrange,
-                                    ),
-                                ],
+                                ),
                               ),
-                            ),
-                          ),
+                            );
+                          }).toList(),
                         ),
-                      );
-                    }),
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     SizedBox(
                       width: double.infinity,
@@ -660,6 +679,7 @@ Future<void> _spinWheel() async {
                     // Budget filter
                     TextField(
                       controller: _budgetController,
+                      enabled: !_spinning,
                       keyboardType:
                           const TextInputType.numberWithOptions(
                         decimal: true,
@@ -667,6 +687,7 @@ Future<void> _spinWheel() async {
                       decoration: InputDecoration(
                         labelText: 'Budget (₱)',
                         hintText: 'Example: 100',
+                        errorText: _budgetError,
                         prefixIcon:
                             const Icon(Icons.payments_outlined),
                         filled: true,
@@ -682,7 +703,7 @@ Future<void> _spinWheel() async {
                     // Custom category selector
                     InkWell(
                       borderRadius: BorderRadius.circular(16),
-                      onTap: _showCategoryPicker,
+                      onTap: _spinning ? null : _showCategoryPicker,
                       child: InputDecorator(
                         decoration: InputDecoration(
                           labelText: 'Meal Category',
